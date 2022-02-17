@@ -51,7 +51,7 @@
 				}
 				addon_hash = addon_hash.substring(addon_ins2 + 1);
 			}
-			baseurl = 'http://fumen.zui.jp/';
+			baseurl = 'https://web.archive.org/web/20220126190203/http://fumen.zui.jp/';
 			titorg = document.title;
 			enclim = 32768;
 			enc = new Array(enclim + 1024);
@@ -3696,6 +3696,32 @@
 				document.write('<td></table>');
 				document.write('</td></tr>');
 				document.write('</table>');
+				if (location.href.substring(0, 7) == 'http://') {
+					document.write(
+						'<form style="margin:0px;" action="https://web.archive.org/web/20220126190203/http://tinyurl.com/create.php" method="post" target="_blank">'
+					);
+					document.write(
+						'<tt>URL :</tt><input type=text name=url id=url size=40 readonly onfocus="this.select();">'
+					);
+					document.write('<input type="submit" name="submit" id=submit value="Make TinyURL!" disabled><br>');
+					document.write('</form>');
+					document.write(
+						'<tt>VIEW:</tt><input type=text name=view id=view size=24 readonly onfocus="this.select();"> / '
+					);
+					document.write(
+						'<tt>LIST:</tt><input type=text name=dump id=dump size=24 readonly onfocus="this.select();"><br>'
+					);
+				} else {
+					document.write(
+						'<tt>URL :</tt><input type=text name=url id=url size=62 readonly onfocus="this.select();"><br>'
+					);
+					document.write(
+						'<tt>VIEW:</tt><input type=text name=view id=view size=24 readonly onfocus="this.select();"> / '
+					);
+					document.write(
+						'<tt>LIST:</tt><input type=text name=dump id=dump size=24 readonly onfocus="this.select();"><br>'
+					);
+				}
 				tmp = location.href.indexOf('?');
 				if (tmp < 0) tmp = location.href.length;
 				tmp2 = location.href.indexOf('#');
