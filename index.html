@@ -2638,7 +2638,9 @@ document.write('</table>');
   }else{
     document.write('<a href="'+location.search.substring(0,cmd+1)+'D'+verstr.substring(1)+'">[Min]</a>');
   }
-  dumpstep=5;
+  if (!("dumpstep" in localStorage)) dumpstep=5;
+  else dumpstep = localStorage.getItem("dumpstep")
+  localStorage.setItem("dumpstep", dumpstep);
   k=0;
   document.write('<table>');
   document.write('<tr>');
