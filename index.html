@@ -1183,6 +1183,7 @@ function encode(focusset){ // ★ データ出力
   keybuttonenable(p[0]>0);
   if(focusset){
     url.focus();
+    navigator.clipboard.writeText(url.value);
   }
 }
 
