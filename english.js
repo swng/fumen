@@ -30,13 +30,15 @@ STRING_CODE_LOAD         = "☆ Load Data"; // "☆ データ読み込み";
 STRING_DESTROY_CONFIRM   = "※ Current data will be lost."; // "※ 作成中のデータは失われます。";
 
 STRING_FRAME_DELETE      = "－ Delete current frame"; // "－ 現ページ削除";
-STRING_FRAME_INSERT      = "＋ Copy current frame"; // "＋ 現ページ複製";
+STRING_FRAME_INSERT      = "＋ Duplicate current frame"; // "＋ 現ページ複製";
 STRING_FRAME_DELPAST     = "／ Clear past frames"; // "／ 前ページまでを削除";
 STRING_FRAME_IMPORT      = "＃ Append Data"; // "＃ 追加読み込み";
 STRING_DELPAST_CONFIRM   = "Are you sure you want to clear all past frames?"; // "前ページまでを完全に削除してよろしいですか？";
 
 STRING_WIKICODE_UPPERCASE= "Upper-case"; // "大文字";
 STRING_WIKICODE_OUTPUT   = "Output Diagram code"; // "Wikiコード出力";
+STRING_WIKICODE_COPY     = "Copy Diagram code"; // "Wikiコードをコピー";
+STRING_WIKICODE_COPY_MSG = "Copied to clipboard"; // "クリップボードにコピーしました";
 STRING_WIKICODE_ALLPAGES = "All pages"; // "全ページ";
 STRING_WIKICODE_ALIGN    = "Align height"; // "高さを揃える";
 STRING_WIKICODE_COMMENTS = "Comments"; // "コメント";

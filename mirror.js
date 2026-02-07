@@ -47,6 +47,8 @@ function mirror() {
 
 	this.drawpiece();
 	this.drawfield();
+
+	updated();
 }
 
-addon_ui += '<input type=button value="Mirror" onclick="mirror();"><br>'
+addon_ui += '<input type=button id="mirror" value="Mirror" onclick="mirror();"><br>'

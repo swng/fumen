@@ -5,6 +5,7 @@ function greyOut() {
         }
     }
     this.drawfield();
+    updated();
 }
 
-addon_ui += '<input type=button value="Grey Out" onclick="greyOut();"><br>';
+addon_ui += '<input type=button id="gout" value="Grey Out" onclick="greyOut();"><br>';

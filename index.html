@@ -1,20 +1,13 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=Shift_JIS">
 
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
-<html>
-<head>
-<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=x-sjis">
 <style type="text/css">
 <!--
 td{font-size:12pt;}
 -->
 </style>
-<title>fumen Ver 1.15f</title>
+<title>Fumen Ver 1.15e</title>
 <script language="JavaScript">
 <!--
-
-// Using default Add-on file
-// None:"" or Use:"file1.js|file2.js"
-ADDON_JS_FILENAME = "english.js|onclose.js|greyout.js|mirror.js|listing.js|frame.js|pfcode.js";
 
 // String table for the language localization
 STRING_FIELD_SETTING     = "フィールド作成";
@@ -46,11 +39,32 @@ STRING_DESTROY_CONFIRM   = "※ 作成中のデータは失われます。";
 
 /*
 連続テト譜エディタ by Mihys
+Ver 1.15f6(2026/01/29)
+・Show list view under editor. Clicking on a frame in that list view jumps to that frame in the editor.
+・Setting to control number of frames per row in list view
+Ver 1.15f5(2025/12/27)
+・Settings menu with hotkeys
+Ver 1.15f4(2025/12/22)
+・Auto Color addon
+Ver 1.15f3(2025/12/20)
+・Fixed security issue that allowed for remote script execution on harddrop wiki
+・Fumen url now supports #? syntax in front of the fumen string, this allows for much longer character limits
+Ver 1.15f2(2025/09/29)
+・Hide add-on button and show the addon UI by default
+・Auto update pfcode diagram when Auto Output is checked
+・Added a copy to clipboard button for pfcode
+・Turned onclose add-on into checkbox so people can disable/enable it as they wish
 Ver 1.15f(2023/07/26)
-・"english.js|onclose.js|greyout.js|mirror.js|listing.js|frame.js|pfcode.js" addons by default
 ・Grey Out frame button
 ・Mirror frame button
-・dumpstep is editable variable in localStorage (number of columns per row in list view)
+Note written by zyphdoz: These "1.15f" add-ons are taken from https://fumen.sixwi.de/ and they were made by swng.
+As of 2025/09/29 there is no official fumen version called 1.15f so if Mihys ever makes a new fumen version and is unaware that swng has made a "1.15f",
+there might be an official fumen version which is also called 1.15f but with a different feature set than this "1.15f".
+This could potentially cause some confusion which is why I am leaving this note here hoping it could clear up that confusion.
+This potential name collission is also why I haven't updated the <title> and it still says 1.15e there. 
+I believe the less people who have seen "1.15f" somewhere, the less the potential for confusion would be if an official Ver 1.15f gets released with a different feature set.
+Ideally, Mihys would see this and incorporate grayout.js and mirror.js into the official fumen and release it as Ver 1.15f and we avoid the confusion. 
+
 Ver 1.15e(2021/11/07)
 ・ダークモード(prefers-color-scheme:dark)に対応。
 ・「Fumen for mobile誘導」新規ウィンドウ表示ボタン追加。
@@ -161,19 +175,36 @@ Ver 0.90  (2005/03/08)
 ・ HTMLソース1つで実行可能。
 */
 
-addon_ui="";
+const defaultFumenSettings = {
+  autoOutputCheckedByDefault: true,
+  onclose: false,
+  alwaysShowAddonUI: true,
+  dumpstep: 6,
+  showListViewUnderEditor: true,
+};
 
-addon_hash="";
-if(ADDON_JS_FILENAME)addon_hash+=ADDON_JS_FILENAME+'|';
-addon_hash+=location.hash.substring(1);
-for(addon_cnt=0;addon_cnt<100&&addon_hash.length>0;addon_cnt++){
-  addon_ins2=addon_hash.indexOf('|');
-  if(addon_ins2<0)addon_ins2=addon_hash.length;
-  if(addon_ins2>0){
-    document.write('<script language="JavaScript" src="'+addon_hash.substring(0,addon_ins2)+'"></script>');
-  }
-  addon_hash=addon_hash.substring(addon_ins2+1);
+let settings;
+
+try {
+  settings = JSON.parse(localStorage.getItem('fumen_settings') || '{}');
+} catch {
+  settings = {};
 }
+
+if (
+  !settings ||
+  typeof settings !== 'object' ||
+  Object.keys(settings).length === 0
+) {
+  settings = defaultFumenSettings;
+} else {
+  settings = {
+    ...defaultFumenSettings,
+    ...settings,
+  };
+}
+
+addon_ui="";
 
 baseurl_https="https://fumen.zui.jp/";
 baseurl_http="http://fumen.zui.jp/";
@@ -393,7 +424,13 @@ function versioncheck(startframe){ // バージョン判定
       return;
     }
   }
-  if(tx!=null)verstr=tx.value;
+  if(tx!=null) {
+    verstr=tx.value;
+  } else {
+    if(location.toString().split('#?')[1]!==undefined){
+      verstr=location.toString().split('#?')[1];
+    }
+  }
   insurl1=verstr.indexOf(':');
   insurl2=verstr.indexOf('?');
   if(insurl1>=0&&insurl2>=0&&insurl1<insurl2)verstr=verstr.substring(insurl2+1);
@@ -401,7 +438,13 @@ function versioncheck(startframe){ // バージョン判定
   if(lng<0){
     decode090(startframe);
   }else{
-    if(edit!=null){edit.innerHTML='<a target="_blank" href="'+location.search.substring(0,cmd+1)+'v'+tx.value.substring(1)+'">[Edit]</a>';}
+    if(edit!=null){
+      if(hasHashTagInUrl()){
+        edit.innerHTML='<a target="_blank" href="'+location.href.replace('#?m','#?v')+'">[Edit]</a>';
+      }else{
+        edit.innerHTML='<a target="_blank" href="'+location.search.substring(0,cmd+1)+'v'+tx.value.substring(1)+'">[Edit]</a>';
+      }
+    }
     encstr=verstr.substring(lng+1);
     tmpstr=verstr.substring(0,lng);
     verstr='';
@@ -1168,24 +1211,57 @@ function encode(focusset){ // ★ データ出力
     encstr=encstr+enctbl.charAt(enc[i]);
   if(i%47==41)encstr=encstr+"?";
   }
+  const fieldHasChanged = tx.value !== encstr;
   tx.value=encstr;
   tmp=location.href.indexOf('?');if(tmp<0)tmp=location.href.length;
   tmp2=location.href.indexOf('#');if(tmp2<0)tmp2=location.href.length;
   if(tmp2<tmp)tmp=tmp2;
-  url.value=location.href.substring(0,tmp)+'?'+encstr;
+  url.value=location.href.substring(0,tmp)+'#?'+encstr;
   if(submit!=null){submit.disabled=false;}
-  view.value=location.href.substring(0,tmp)+'?m'+encstr.substring(1);
-  dump.value=location.href.substring(0,tmp)+'?D'+encstr.substring(1);
+  view.value=location.href.substring(0,tmp)+'#?m'+encstr.substring(1);
+  dump.value=location.href.substring(0,tmp)+'#?D'+encstr.substring(1);
   viewjmp.href=view.value;
   dumpjmp.href=dump.value;
   out.className="theme5a";
   refreshquiz(frame,0,1,0,0);
   keybuttonenable(p[0]>0);
+  // focusset is only true when the output data button is clicked
   if(focusset){
     url.focus();
-    navigator.clipboard.writeText(url.value);
+    renderListViewForEditPage();
   }
 }
+
+let lastActiveElement = document.activeElement;
+function autoOutputAfterEdit() {
+  if (!isOnEditorPage || !aout.checked) return;
+  const active = document.activeElement;
+  const isFocusingTextInput = pgnm === active ||
+                              cm === active ||
+                              tx === active  ||
+                              document.getElementById('pfcode') === active ||
+                              kbd === active ||
+                              url === active ||
+                              view === active ||
+                              dump === active;
+  // prevent auto output from overwriting the new pfcode string after pasting it
+  if (lastActiveElement === tx && !isFocusingTextInput) {
+    lastActiveElement = active;
+    return;
+  }
+  lastActiveElement = active;
+  if (!isFocusingTextInput) {
+    // setTimeout 0 to ensure the update happens after fumen state update
+    setTimeout(()=>{
+      encode(0);
+      renderListViewForEditPage();
+      outputpfcode(false);
+    },0)
+  } 
+}
+// only update auto output after keyup and mouseup events to reduce lagg on large fumens
+document.addEventListener('keyup', autoOutputAfterEdit);
+document.addEventListener('mouseup', autoOutputAfterEdit);
 
 function pushframe(pfframe){ // 指定フレームへ転送
   var up=document.getElementById("up");
@@ -1239,7 +1315,16 @@ function main(){ // 初期設定
   pgset();
   updateflag=0;
   cmd=location.search.indexOf('?')
-  if(cmd>=0)tx.value=location.search.substring(cmd+1);versioncheck(0);
+  if(cmd>=0){
+    tx.value=location.search.substring(cmd+1);
+  } else { // url contains either #? or no fumen string
+    if(location.href.indexOf('?') > 0){
+      tx.value=location.toString().split('#?')[1];
+    } else { // url contains no fumen string
+      return;
+    }
+  }
+  versioncheck(0);
   refreshcolor();
 }
 
@@ -1314,10 +1399,14 @@ function pgnext(pgtype){ // 次ページ ▼
   }
 }
 
-function delpage(){ // × 次ページ以降を削除
+function delpage(shouldShowConfirmDialog = 1){ // × 次ページ以降を削除
   var pg=document.getElementById("pg");
   if(frame<framemax){
-    if(confirm(STRING_TRUNCATE_CONFIRM)==1){
+    if(!shouldShowConfirmDialog){
+      framemax=frame;
+      updated();
+      refreshPage();
+    } else if (confirm(STRING_TRUNCATE_CONFIRM)==1){
       framemax=frame;
       updated();
       refreshPage();
@@ -1732,6 +1821,10 @@ function refreshPage(){ // ページ番号リフレッシュ
   last.disabled=(frame>=framemax);
   del.disabled=(frame>=framemax);
   keybuttonenable(p[0]>0);
+  // if Auto Output is checked, update the pfcode when we change frame
+  if(isOnEditorPage && aout.checked){
+    outputpfcode(false);
+  }
 }
 
 function updated(){ // データ更新時
@@ -1745,7 +1838,7 @@ function updated(){ // データ更新時
   var dumpjmp=document.getElementById("dumpjmp");
   updateflag=1;
   if(aout.checked){
-    encode(0);
+    //encode(0);
   }else{
     out.className="theme5b";
     url.value="";
@@ -2320,9 +2413,15 @@ function previewpiece(id,t,r){ // ピースプレビュー表示
     }
   }
 }
-
 // -->
 </script>
+<script language="JavaScript" src="./localStorage.js"></script>
+<script language="JavaScript" src="./english.js"></script>
+<script language="JavaScript" src="./greyout.js"></script>
+<script language="JavaScript" src="./mirror.js"></script>
+<script language="JavaScript" src="./listing.js"></script>
+<script language="JavaScript" src="./frame.js"></script>
+<script language="JavaScript" src="./pfcode.js"></script>
 <style type="text/css">
 <!--
 td{font-size:12pt;}
@@ -2349,12 +2448,15 @@ td{font-size:12pt;}
 -->
 </style>
 </head>
-<body leftmargin=0 topmargin=0 rightmargin=0 bottommargin=0 onload="main();" class=theme1>
+<body leftmargin="0" topmargin="0" rightmargin="0" bottommargin="0" onload="main();" class="theme1">
 <script language="JavaScript">
 <!--
-cmd=location.search.indexOf('?')
-if(cmd>=0){
-  verstr=location.search.substring(cmd+1);
+if(location.href.indexOf('?') > 0){
+  if(hasHashTagInUrl()){
+    verstr=location.toString().split('#?')[1];
+  } else {
+    verstr=location.toString().split('?')[1];
+  }
   lng=verstr.indexOf('@')
   if(lng>=0){
     tmpstr=verstr.substring(0,lng);
@@ -2485,7 +2587,7 @@ document.write('</td>');
 document.write('</tr>');
 
 document.write('<tr>');
-document.write('<td align=center valign=bottom onmouseup="document.getElementById(\'nx\').focus();">');
+document.write('<td align=center valign=bottom">');
 document.write('<table border=0 cellspacing=1 cellpadding=0>'); // フィールド
 for(i=0;i<fldlines-1;i++){
 document.write('<tr>');
@@ -2499,7 +2601,7 @@ document.write('</td>');
 document.write('</tr>');
 
 document.write('<tr>');
-document.write('<td align=center valign=top onmouseup="document.getElementById(\'nx\').focus();">');
+document.write('<td align=center valign=top;">');
 document.write('<table border=0 cellspacing=1 cellpadding=0>'); // せり上がりフィールド
 for(i=0;i<1;i++){
 document.write('<tr>');
@@ -2515,10 +2617,15 @@ document.write('<tr><td colspan=2 class=theme2 align=center>');
 document.write('<table width="100%" border=0 cellspacing=0 cellpadding=0>');
 document.write('<td align=center><textarea name=tx id=tx cols=24 rows=4 style="font-size:10pt;" onfocus="this.select();"></textarea>');
 document.write('<td align=center valign=bottom>');
-document.write('<div align=left><input type=button value="'+STRING_CODE_LOAD+'" onclick="versioncheck(0);"></div>');
-document.write('<div align=center><input type=button value="'+STRING_CODE_NEW+'" onclick="newdata();"></div>');
+document.write('<div align=left><input type=button id="loaddatabtn" value="'+STRING_CODE_LOAD+'" onclick="versioncheck(0);renderListViewForEditPage();"></div>');
+document.write('<div align=center><input type=button id="newdatabtn"" value="'+STRING_CODE_NEW+'" onclick="newdata();"></div>');
 if(addon_ui){
-document.write('<div align=right><input type=button value="Add-on..." name=apb id=apb onclick="this.disabled=true;document.getElementById(\'apm\').innerHTML=addon_ui;"></div>');
+  const alwaysShowAddonUI = settings.alwaysShowAddonUI;
+  if (alwaysShowAddonUI === true || alwaysShowAddonUI === undefined ) {
+    document.getElementById('apm').innerHTML=addon_ui;
+  } else {
+    document.write('<div align=right><input type=button value="Add-on..." name=apb id=apb onclick="this.disabled=true;document.getElementById(\'apm\').innerHTML=addon_ui;"></div>');
+  }
 }
 document.write('<td></table>');
 document.write('</td></tr>');
@@ -2543,9 +2650,6 @@ document.write('<a target="_blank" href="./old/">Older</a>');
 document.write(' / ');
 document.write('<a target="_blank" href="./addon/">Add-on</a>');
 }
-document.write('<br>');
-document.write('<input type=button value="Fumen for mobile" style="font-size:'+((window.devicePixelRatio!=null?window.devicePixelRatio-0:1)*14)+'px;" onclick="encode(0);location.href=\'https://knewjade.github.io/fumen-for-mobile/#?d=\'+document.getElementById(\'tx\').value;">');
-document.write('<input type=button value="+" style="font-size:'+((window.devicePixelRatio!=null?window.devicePixelRatio-0:1)*14)+'px;" onclick="encode(0);window.open(\'https://knewjade.github.io/fumen-for-mobile/#?d=\'+document.getElementById(\'tx\').value,\'_blank\');">');
 }else if(mini==1){ // VIEW
 
 document.write('<table border=1 cellspacing=0 cellpadding=0 style="background-color:#333333;"');
@@ -2634,21 +2738,722 @@ document.write('</td>');
 document.write('</tr>');
 document.write('</table>');
 }else if(mini==2){ // DUMP
+  renderListViewForListPage()
+}
+function jumpToFrame(value){
+  const input = document.getElementById('pgnm');
+    if (input) {
+      input.value = value;
+      pgset();
+    }
+}
 
+// custom way to render the list view for the edit page
+// this has been rewritten by an llm to get rid of document write which makes it easier to do live updates
+// the llm was also prompted to remove side effects from the function and to cache the previous values and rerender only the parts of the list that has changed
+// (the original list view modified some globals which caused a lot of problems)
+// also contains some code that allows clicking frames to jump the editor to that frame
+// many of the comments inside of this function is written by llm so take them with a grain of salt
+function renderListViewForEditPage(triggeredByScroll = 0) {
+
+  dumpstep = settings.dumpstep;
+  // Store previous state for comparison
+  if (!renderListViewForEditPage.previousState) {
+    renderListViewForEditPage.previousState = {
+      framemax: -1,
+      dumpstep: -1,
+      af: null,
+      ap: null,
+      ad: null,
+      ac: null,
+      ct: -1,
+      showListViewUnderEditor: null,
+      frame: -1,
+      visibleRange: null,
+      tx: '',
+    };
+  }
+  
+  // Store measured row heights to maintain consistent height when switching between rendered and spacer states
+  if (!renderListViewForEditPage.rowHeights) {
+    renderListViewForEditPage.rowHeights = {};
+  }
+  
+  const prevState = renderListViewForEditPage.previousState;
+  const rowHeights = renderListViewForEditPage.rowHeights;
+  
+  // Check if we should show the list view
+  if (!settings.showListViewUnderEditor || tx.value === 'v115@vhAAgH') {
+    const oldContainer = document.getElementById('listview-container');
+    if (oldContainer) {
+      if (renderListViewForEditPage.scrollHandler) {
+        oldContainer.removeEventListener('scroll', renderListViewForEditPage.scrollHandler);
+      }
+      oldContainer.remove();
+    }
+    
+    prevState.showListViewUnderEditor = false;
+    if (tx.value === 'v115@vhAAgH') {
+      prevState.tx = tx.value;
+    }
+    return;
+  }
+  
+  prevState.showListViewUnderEditor = true;
+  
+  // Check if dumpstep changed - if so, force full rerender
+  const dumpstepChanged = prevState.dumpstep !== dumpstep;
+  
+  // Clear row heights cache if dumpstep changed since row structure will be different
+  if (dumpstepChanged) {
+    renderListViewForEditPage.rowHeights = {};
+  }
+  
+  // Detect if we only added one frame to the end
+  const onlyAddedOneFrame = framemax === prevState.framemax + 1 && framemax === framemax;
+  
+  // Detect if only the current frame changed (frame stayed the same, framemax unchanged)
+  const onlyCurrentFrameChanged = frame === prevState.frame && 
+                                   framemax === prevState.framemax && 
+                                   !dumpstepChanged &&
+                                   prevState.ct === ct &&
+                                   prevState.tx !== 'v115@vhAAgH';
+  
+  // Get or create scrollable container
+  let container = document.getElementById('listview-container');
+  const isFirstRender = !container;
+  
+  if (isFirstRender) {
+    container = document.createElement('div');
+    container.id = 'listview-container';
+    container.style.cssText = `
+      height: ${window.innerHeight}px;
+      min-width: 734px;
+      width: fit-content;
+      overflow-y: auto;
+      overflow-x: auto;
+    `;
+    document.body.appendChild(container);
+    
+    // Handle window resize - use cached reference
+    if (!renderListViewForEditPage.resizeHandler) {
+      renderListViewForEditPage.resizeHandler = () => {
+        const cont = document.getElementById('listview-container');
+        const spacer = document.getElementById('i-exist-to-facilitate-scrolling');
+        if (cont) {
+          cont.style.height = window.innerHeight + 'px';
+        }
+        if (spacer) {
+          spacer.style.height = window.innerHeight + 'px';
+        }
+      };
+      window.addEventListener('resize', renderListViewForEditPage.resizeHandler);
+    }
+    
+    // Handle scroll events for virtual scrolling
+    if (!renderListViewForEditPage.scrollHandler) {
+      let scrollTimeout;
+      renderListViewForEditPage.scrollHandler = () => {
+        // Debounce scroll events slightly for performance
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          renderListViewForEditPage(1);
+        }, 8); // ~120fps
+      };
+    }
+    container.addEventListener('scroll', renderListViewForEditPage.scrollHandler);
+  }
+  
+  // Get or create list view table
+  let listTable = document.getElementById('listview');
+  
+  if (!listTable || dumpstepChanged) {
+    // Remove existing table if dumpstep changed
+    if (listTable && dumpstepChanged) {
+      listTable.remove();
+      listTable = null;
+    }
+    
+    if (!listTable) {
+      listTable = document.createElement('table');
+      listTable.id = 'listview';
+      // Insert table before the spacer if spacer exists, otherwise just append
+      const spacer = document.getElementById('i-exist-to-facilitate-scrolling');
+      if (spacer) {
+        container.insertBefore(listTable, spacer);
+      } else {
+        container.appendChild(listTable);
+      }
+    }
+  }
+  
+  // Get or create scroll spacer
+  let spacer = document.getElementById('i-exist-to-facilitate-scrolling');
+  if (!spacer) {
+    spacer = document.createElement('div');
+    spacer.id = 'i-exist-to-facilitate-scrolling';
+
+    spacer.style.cssText = `
+      position: relative;
+      height: ${window.innerHeight}px;
+    `;
+
+    const button = document.createElement('button');
+    button.textContent = 'Scroll to top';
+    button.className = 'theme2';
+
+    button.style.cssText = `
+      position: absolute;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: auto;
+      cursor: pointer;
+      z-index: 1;
+    `;
+
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      container.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    });
+
+    spacer.appendChild(button);
+    container.appendChild(spacer);
+  }
+
+
+
+  // local-only dumpmin
+  const localDumpmin = 1;
+
+  const makeRangeCell = (start) => {
+    const td = document.createElement('td');
+    td.align = 'center';
+    td.className = 'theme3';
+    td.textContent =
+      (start + 1) +
+      '-' +
+      (start + dumpstep < framemax + 1 ? start + dumpstep : framemax + 1);
+    return td;
+  };
+
+  const renderFrame = (k, outerTd) => {
+    // Clear and rebuild this cell
+    outerTd.innerHTML = '';
+    
+    const outerTable = document.createElement('table');
+    outerTable.width = 94;
+    outerTable.border = 1;
+    outerTable.cellSpacing = 0;
+    outerTable.cellPadding = 0;
+    outerTable.style.backgroundColor = '#333333';
+    outerTable.style.cursor = 'pointer';
+
+    // hint that the frames are clickable by changing mouse cursor
+    outerTable.addEventListener('mouseenter', () => {
+      outerTable.style.backgroundColor = '#616161';
+    });
+
+    // restore background
+    outerTable.addEventListener('mouseleave', () => {
+      outerTable.style.backgroundColor = '#333333';
+    });
+
+    // pressed state (shrink) and jump to frame
+    outerTable.addEventListener('mousedown', () => {
+      jumpToFrame(k+1);
+      outerTd.style.transform = 'scale(0.98)';
+    });
+
+    // release
+    outerTable.addEventListener('mouseup', () => {
+      outerTd.style.transform = 'scale(1)';
+    });
+
+    // safety reset if cursor leaves while pressed
+    outerTable.addEventListener('mouseleave', () => {
+      outerTd.style.transform = 'scale(1)';
+    });
+
+    outerTd.appendChild(outerTable);
+
+    let tr = document.createElement('tr');
+    outerTable.appendChild(tr);
+
+    let td = document.createElement('td');
+    td.align = 'center';
+    td.vAlign = 'bottom';
+    tr.appendChild(td);
+
+    let fieldTable = document.createElement('table');
+    fieldTable.border = 0;
+    fieldTable.cellSpacing = 1;
+    fieldTable.cellPadding = 0;
+    td.appendChild(fieldTable);
+
+    // ---- LOCAL STATE COPIES ----
+
+    const fLocal = new Array(fldblks);
+    for (let i = 0; i < fldblks; i++) {
+      fLocal[i] = af[k * fldblks + i];
+    }
+
+    const pLocal = [
+      ap[3 * k + 0],
+      ap[3 * k + 1],
+      ap[3 * k + 2]
+    ];
+
+    let dpt = pLocal[0];
+    let dpr = pLocal[1];
+
+    if (dpt >= 1 && dpt <= 7) {
+      let dpid = pLocal[2];
+      for (let dpi = 0; dpi < 4; dpi++) {
+        let dptmp1 =
+          (dpid % 10) + b[dpt * 32 + dpr * 8 + dpi * 2] - 1;
+        let dptmp2 =
+          Math.floor(dpid / 10) +
+          b[dpt * 32 + dpr * 8 + dpi * 2 + 1] -
+          1;
+
+        if (
+          dptmp1 >= 0 &&
+          dptmp1 <= 9 &&
+          dptmp2 >= 0 &&
+          dptmp2 <= fldlines - 2
+        ) {
+          fLocal[dptmp2 * 10 + dptmp1] = dpt + 9;
+        }
+      }
+    }
+
+    for (let rfj = 0; rfj < fldblks; rfj += 10) {
+      let rfc = 0;
+      let dcch = !ad[k];
+
+      if (dcch && rfj < fldblks - 10) {
+        for (let rfi = 0; rfi < 10; rfi++) {
+          let rfji = rfj + rfi;
+          if (fLocal[rfji]) {
+            rfc++;
+          } else if (pLocal[0] > 0) {
+            for (let rfk = 0; rfk < 4; rfk++) {
+              if (
+                pLocal[2] +
+                  b[pLocal[0] * 32 + pLocal[1] * 8 + rfk * 2 + 1] * 10 +
+                  b[pLocal[0] * 32 + pLocal[1] * 8 + rfk * 2] -
+                  11 ===
+                rfji
+              ) {
+                rfc++;
+              }
+            }
+          }
+        }
+      }
+
+      let ff = localDumpmin ? 0 : 1;
+      for (let rfi = -10; rfi < 20; rfi++) {
+        let rfji = rfj + rfi;
+        if (rfji >= 0 && rfji < fldblks && fLocal[rfji]) {
+          ff = 1;
+        }
+      }
+
+      if (ff) {
+        let trf = document.createElement('tr');
+        fieldTable.appendChild(trf);
+
+        for (let rfi = 0; rfi < 10; rfi++) {
+          let rfji = rfj + rfi;
+          let cell = document.createElement('td');
+          cell.width = 8;
+          cell.height = rfi < 1 ? 4 : 8;
+          cell.style.backgroundColor =
+            c[
+              ct * 27 +
+                fLocal[rfji] +
+                (rfc === 10 && fLocal[rfji] > 0 && fLocal[rfji] < 9) * 18 +
+                (rfji < fldblks - 210 && fLocal[rfji] === 0) * 9
+            ];
+          trf.appendChild(cell);
+        }
+      }
+
+      if (rfj === fldblks - 20) {
+        tr = document.createElement('tr');
+        outerTable.appendChild(tr);
+
+        td = document.createElement('td');
+        td.align = 'center';
+        td.vAlign = 'bottom';
+        tr.appendChild(td);
+
+        fieldTable = document.createElement('table');
+        fieldTable.border = 0;
+        fieldTable.cellSpacing = 1;
+        fieldTable.cellPadding = 0;
+        td.appendChild(fieldTable);
+      }
+    }
+
+    let cf = localDumpmin ? 0 : 1;
+    for (let cfk = 0; cfk < dumpstep; cfk++) {
+      if (ac[Math.floor(k / dumpstep) * dumpstep + cfk]) {
+        cf = 1;
+      }
+    }
+
+    if (cf) {
+      const ta = document.createElement('textarea');
+      ta.cols = 12;
+      ta.rows = 3;
+      ta.readOnly = true;
+      ta.style.fontSize = '9pt';
+      ta.className =
+        ac[k] === '' || (k > 0 && ac[k] === ac[k - 1])
+          ? 'theme4a'
+          : 'theme4b';
+
+      ta.textContent = ac[k];
+      outerTd.appendChild(ta);
+    }
+  };
+
+  // Calculate visible range based on scroll position
+  const scrollTop = container.scrollTop;
+  const containerHeight = container.clientHeight;
+  
+  // Calculate total rows
+  const totalRows = Math.ceil((framemax + 1) / dumpstep);
+  
+  // Calculate visible range by iterating through row heights
+  let firstVisibleRow = 0;
+  let lastVisibleRow = totalRows - 1;
+  
+  const DEFAULT_ROW_HEIGHT = 96;
+  const BUFFER_ROWS = 2; // Render extra rows above and below viewport
+  
+  // Build an array of cumulative heights for each row
+  const cumulativeHeights = [0];
+  for (let i = 0; i < totalRows; i++) {
+    const rowHeight = rowHeights[i] || DEFAULT_ROW_HEIGHT;
+    // Add +2 to account for the space between the rows 
+    cumulativeHeights.push(cumulativeHeights[i] + rowHeight + 2);
+  }
+  
+  // Total height of all table rows
+  const totalTableHeight = cumulativeHeights[totalRows];
+  
+  // The spacer div adds extra scrollable space at the bottom
+  // When scrollTop exceeds the table height, we need to adjust our calculations
+  // to account for scrolling into the spacer area
+  const adjustedScrollTop = Math.min(scrollTop, totalTableHeight);
+  const adjustedScrollBottom = Math.min(scrollTop + containerHeight, totalTableHeight);
+  
+  // Find first visible row - the row whose bottom edge is past adjustedScrollTop
+  for (let i = 0; i < totalRows; i++) {
+    //if (cumulativeHeights[i + 1] > adjustedScrollTop) {
+    if (cumulativeHeights[i + 1] > scrollTop) {
+      firstVisibleRow = Math.max(0, i - BUFFER_ROWS);
+      break;
+    }
+  }
+  
+  // Find last visible row - the row whose top edge is before adjustedScrollBottom
+  for (let i = 0; i < totalRows; i++) {
+    if (cumulativeHeights[i] >= adjustedScrollBottom) {
+      lastVisibleRow = Math.min(totalRows - 1, i + BUFFER_ROWS);
+      break;
+    }
+  }
+  
+  const firstVisibleFrame = firstVisibleRow * dumpstep;
+  const lastVisibleFrame = Math.min(framemax, (lastVisibleRow + 1) * dumpstep - 1);
+  
+  const visibleRange = { firstVisibleFrame, lastVisibleFrame, firstVisibleRow, lastVisibleRow };
+
+  // If only the current frame changed, and this function was not triggered by scroll, just update that one frame if it's visible
+  if (onlyCurrentFrameChanged && !triggeredByScroll && hasFrameChanged(frame, prevState)) {
+    const k = frame;
+    
+    // Only update if the frame is in the visible range
+    if (k >= firstVisibleFrame && k <= lastVisibleFrame) {
+      const currentRowIndex = Math.floor(k / dumpstep);
+      const row = listTable.rows[currentRowIndex];
+      
+      if (row) {
+        const cellIndexInRow = (k % dumpstep) + 1;
+        const outerTd = row.cells[cellIndexInRow];
+        
+        if (outerTd) {
+          renderFrame(k, outerTd);
+        }
+      }
+    }
+    
+    // Update previous state
+    prevState.framemax = framemax;
+    prevState.dumpstep = dumpstep;
+    prevState.ct = ct;
+    prevState.frame = frame;
+    prevState.visibleRange = visibleRange;
+    prevState.tx = tx.value;
+    if (af) prevState.af = new Uint8Array(af);
+    if (ap) prevState.ap = new Uint8Array(ap);
+    if (ad) prevState.ad = new Uint8Array(ad);
+    if (ac) prevState.ac = [...ac];
+    
+    return;
+  }
+  
+  // If we only added one frame at the end, just render that frame if it's visible
+  if (frame === framemax && onlyAddedOneFrame && !dumpstepChanged && prevState.ct === ct) {
+    const k = framemax;
+
+    // Only render if the new frame is in the visible range
+    if (k >= firstVisibleFrame && k <= lastVisibleFrame) {
+      const currentRowIndex = Math.floor(k / dumpstep);
+      let row = listTable.rows[currentRowIndex];
+      
+      // Check if we need a new row
+      if (!row) {
+        row = document.createElement('tr');
+        listTable.appendChild(row);
+        
+        // Add range cell for new row
+        row.appendChild(makeRangeCell(k));
+      } else if (k % dumpstep === 0) {
+        // Update range cell if this is the start of a new row section
+        const newRangeCell = makeRangeCell(k);
+        if (row.cells[0]) {
+          row.cells[0].align = newRangeCell.align;
+          row.cells[0].className = newRangeCell.className;
+          row.cells[0].textContent = newRangeCell.textContent;
+        } else {
+          row.appendChild(newRangeCell);
+        }
+      } else {
+        // Update the range cell of the current row to include the new frame
+        const rangeStart = currentRowIndex * dumpstep;
+        const newRangeCell = makeRangeCell(rangeStart);
+        row.cells[0].align = newRangeCell.align;
+        row.cells[0].className = newRangeCell.className;
+        row.cells[0].textContent = newRangeCell.textContent;
+      }
+      
+      const cellIndexInRow = (k % dumpstep) + 1;
+      
+      // Create the new cell for this frame
+      const outerTd = document.createElement('td');
+      outerTd.align = 'left';
+      outerTd.vAlign = 'bottom';
+      outerTd.style.transition = 'transform 0.02s ease';
+      row.appendChild(outerTd);
+      
+      // Build the frame content
+      renderFrame(k, outerTd);
+    }
+    
+    // Update previous state
+    prevState.framemax = framemax;
+    prevState.dumpstep = dumpstep;
+    prevState.ct = ct;
+    prevState.frame = frame;
+    prevState.visibleRange = visibleRange;
+    prevState.tx = tx.value;
+    if (af) prevState.af = new Uint8Array(af);
+    if (ap) prevState.ap = new Uint8Array(ap);
+    if (ad) prevState.ad = new Uint8Array(ad);
+    if (ac) prevState.ac = [...ac];
+    
+    return;
+  }
+
+  
+  // Full render - but only for visible frames
+  // Store current scroll position to restore after render
+  const scrollPositionBefore = container.scrollTop;
+  
+  // Ensure all rows exist (but we'll only populate visible ones)
+  for (let rowIndex = 0; rowIndex <= Math.floor(framemax / dumpstep); rowIndex++) {
+    let row = listTable.rows[rowIndex];
+    if (!row) {
+      row = document.createElement('tr');
+      listTable.appendChild(row);
+    }
+    
+    // Always ensure range cell exists and is correct
+    const rangeStart = rowIndex * dumpstep;
+    if (!row.cells[0]) {
+      row.appendChild(makeRangeCell(rangeStart));
+    } else {
+      const newRangeCell = makeRangeCell(rangeStart);
+      row.cells[0].align = newRangeCell.align;
+      row.cells[0].className = newRangeCell.className;
+      row.cells[0].textContent = newRangeCell.textContent;
+    }
+    
+    // Add height placeholder if row is not visible (for scrolling)
+    if (rowIndex < firstVisibleRow || rowIndex > lastVisibleRow) {
+      // Clear frame cells but keep range cell
+      while (row.cells.length > 1) {
+        row.deleteCell(1);
+      }
+      // Add a spacer cell with the exact height this row had when it was rendered
+      const spacerCell = document.createElement('td');
+      const measuredHeight = rowHeights[rowIndex] || DEFAULT_ROW_HEIGHT;
+      spacerCell.style.height = measuredHeight + 'px';
+      spacerCell.style.minHeight = measuredHeight + 'px';
+      spacerCell.style.maxHeight = measuredHeight + 'px';
+      spacerCell.colSpan = dumpstep;
+      row.appendChild(spacerCell);
+      continue;
+    }
+    
+    // Remove spacer cell if it exists (we're now rendering this row)
+    if (row.cells.length === 2 && row.cells[1].colSpan === dumpstep) {
+      row.deleteCell(1);
+    }
+    
+    // Render frames in this visible row
+    const startFrame = rowIndex * dumpstep;
+    const endFrame = Math.min(startFrame + dumpstep - 1, framemax);
+    
+    for (let k = startFrame; k <= endFrame; k++) {
+      const cellIndexInRow = (k % dumpstep) + 1;
+      
+      // Check if this frame needs updating
+      const needsUpdate = isFirstRender ||
+        dumpstepChanged ||
+        prevState.framemax !== framemax ||
+        prevState.ct !== ct ||
+        !prevState.visibleRange ||
+        k < prevState.visibleRange.firstVisibleFrame ||
+        k > prevState.visibleRange.lastVisibleFrame ||
+        hasFrameChanged(k, prevState);
+
+      let outerTd = row.cells[cellIndexInRow];
+      
+      if (!outerTd) {
+        outerTd = document.createElement('td');
+        outerTd.align = 'left';
+        outerTd.vAlign = 'bottom';
+        outerTd.style.transition = 'transform 0.02s ease';
+        row.appendChild(outerTd);
+      }
+
+      if (needsUpdate || !outerTd.firstChild) {
+        renderFrame(k, outerTd);
+      }
+    }
+    
+    // Remove excess cells in this row
+    while (row.cells.length > (endFrame - startFrame + 1) + 1) {
+      row.deleteCell(row.cells.length - 1);
+    }
+    
+    // Measure and cache the height of this rendered row
+    // Use requestAnimationFrame to ensure the DOM has updated
+    requestAnimationFrame(() => {
+      if (row && row.offsetHeight > 0) {
+        rowHeights[rowIndex] = row.offsetHeight;
+      }
+    });
+  }
+
+  // Remove excess rows if framemax decreased
+  const expectedRows = Math.floor(framemax / dumpstep) + 1;
+  while (listTable.rows.length > expectedRows) {
+    listTable.deleteRow(listTable.rows.length - 1);
+  }
+
+  // Restore scroll position if it was triggered by scroll (prevents shake)
+  if (triggeredByScroll) {
+    container.scrollTop = scrollPositionBefore;
+  }
+
+  // Update previous state
+  prevState.framemax = framemax;
+  prevState.dumpstep = dumpstep;
+  prevState.ct = ct;
+  prevState.frame = frame;
+  prevState.visibleRange = visibleRange;
+  prevState.tx = tx.value;
+  if (af) prevState.af = new Uint8Array(af);
+  if (ap) prevState.ap = new Uint8Array(ap);
+  if (ad) prevState.ad = new Uint8Array(ad);
+  if (ac) prevState.ac = [...ac];
+}
+
+function hasFrameChanged(k, prevState) {
+  if (!prevState.af || !prevState.ap || !prevState.ad || !prevState.ac) {
+    return true;
+  }
+  
+  // Check field data
+  for (let i = 0; i < fldblks; i++) {
+    if (af[k * fldblks + i] !== prevState.af[k * fldblks + i]) {
+      return true;
+    }
+  }
+  
+  // Check position data
+  for (let i = 0; i < 3; i++) {
+    if (ap[3 * k + i] !== prevState.ap[3 * k + i]) {
+      return true;
+    }
+  }
+  
+  // Check ad data
+  if (ad[k] !== prevState.ad[k]) {
+    return true;
+  }
+  
+  // Check comment data
+  if (ac[k] !== prevState.ac[k]) {
+    return true;
+  }
+  
+  return false;
+}
+
+// this is the original list view, it is still being used for the original list page (the one where the fumenstring starts with D or d in the url)
+function renderListViewForListPage(){
+  dumpstep = settings.dumpstep;
   cmd=location.search.indexOf('?')
   if(cmd>=0)verstr=location.search.substring(cmd+1);versioncheck(0);
   if(cmd>=0)verstr=location.search.substring(cmd+1);
-  document.write('<a target="_blank" href="'+location.search.substring(0,cmd+1)+'v'+verstr.substring(1)+'">[Edit]</a>');
-  if(dumpmin){
-    document.write('<a href="'+location.search.substring(0,cmd+1)+'d'+verstr.substring(1)+'">[Full]</a>');
-  }else{
-    document.write('<a href="'+location.search.substring(0,cmd+1)+'D'+verstr.substring(1)+'">[Min]</a>');
+  if(hasHashTagInUrl()){
+    verstr = location.href.split('#?')[1];
+    document.write('<a target="_blank" href="'+location.href.replace('#?D','#?v').replace('#?d','#?v')+'">[Edit]</a>');
+    if (dumpmin) {
+      document.write(
+        '<a href="' + location.href.replace('#?D','#?d') + '"' +
+        ' onclick="location.href=this.href; location.reload(); return false;">' +
+        '[Full]</a>'
+      );
+    } else {
+      document.write(
+        '<a href="' + location.href.replace('#?d','#?D') + '"' +
+        ' onclick="location.href=this.href; location.reload(); return false;">' +
+        '[Min]</a>'
+      );
+    }
+  } else { // if url uses ? instead of #? in front of fumen string
+    document.write('<a target="_blank" href="'+location.search.substring(0,cmd+1)+'v'+verstr.substring(1)+'">[Edit]</a>');
+    if(dumpmin){
+      document.write('<a href="'+location.search.substring(0,cmd+1)+'d'+verstr.substring(1)+'">[Full]</a>');
+    }else{
+      document.write('<a href="'+location.search.substring(0,cmd+1)+'D'+verstr.substring(1)+'">[Min]</a>');
+    }
   }
-  if (!("dumpstep" in localStorage)) dumpstep=5;
-  else dumpstep = parseInt(localStorage.getItem("dumpstep"));
-  localStorage.setItem("dumpstep", dumpstep);
   k=0;
-  document.write('<table>');
+  document.write('<table id=listview>');
   document.write('<tr>');
   document.write('<td align=center class=theme3>'+(k+1)+'-'+(k+dumpstep<framemax+1?k+dumpstep:framemax+1)+'</td>');
   for(k=0;k<=framemax;k++){
@@ -2737,9 +3542,21 @@ document.write('</table>');
     document.write('</td>');
   }
   document.write('</table>');
-  document.write('<a href="#">[Top]</a>');
+  document.write(
+    '<a href="#" onclick="window.scrollTo({ top: 0, behavior: \'smooth\' }); return false;">' +
+    '[Top]</a>'
+  );
 }
+function hasHashTagInUrl(){
+  return location.href.indexOf('#?') !== - 1;
+}
+
+var isOnEditorPage = mini === 0;
+
 // -->
 </script>
-</body>
-</html>
+<script language="JavaScript" src="./autoColor.js"></script>
+<script language="JavaScript" src="./settingsMenu.js"></script>
+
+
+</body></html>

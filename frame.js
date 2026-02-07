@@ -9,10 +9,10 @@ if(typeof STRING_FRAME_IMPORT    == 'undefined') STRING_FRAME_IMPORT    = "＃ �
 if(typeof STRING_DELPAST_CONFIRM == 'undefined') STRING_DELPAST_CONFIRM = "前ページまでを完全に削除してよろしいですか？";
 
 addon_ui += '<hr width=90% size=1>';
-addon_ui += '<input type=button value="'+STRING_FRAME_DELETE+'" onclick="deletepage();dblclickchk=1;" ondblclick="if(dblclickchk==0)deletepage();"><br>';
-addon_ui += '<input type=button value="'+STRING_FRAME_INSERT+'" onclick="insertpage();dblclickchk=1;" ondblclick="if(dblclickchk==0)insertpage();"><br>';
-addon_ui += '<input type=button value="'+STRING_FRAME_DELPAST+'" onclick="delpastpage();"><br>';
-addon_ui += '<input type=button value="'+STRING_FRAME_IMPORT+'" onclick="importpage();"><br>';
+addon_ui += '<input type=button id="delframe" value="'+STRING_FRAME_DELETE+'" onclick="deletepage();dblclickchk=1;" ondblclick="if(dblclickchk==0)deletepage();"><br>';
+addon_ui += '<input type=button id="duplframe" value="'+STRING_FRAME_INSERT+'" onclick="insertpage();dblclickchk=1;" ondblclick="if(dblclickchk==0)insertpage();"><br>';
+addon_ui += '<input type=button id="clearpastframes" value="'+STRING_FRAME_DELPAST+'" onclick="delpastpage();"><br>';
+addon_ui += '<input type=button id="appenddata" value="'+STRING_FRAME_IMPORT+'" onclick="importpage();"><br>';
 
 function copyframe(srcframe,dstframe){
   for(var pfi=0;pfi<fldblks;pfi++)af[dstframe*fldblks+pfi]=af[srcframe*fldblks+pfi];
