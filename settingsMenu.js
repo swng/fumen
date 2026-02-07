@@ -520,6 +520,19 @@
         )
     };
 
+    /**
+     * checks if the keyCode is registered as a hotkey
+     */
+    const isRegisteredHotkey = (keyCode) => {
+        for (const settingName in fumenSettings) {
+            const value = fumenSettings[settingName];
+            if (typeof value === 'string' && value === keyCode) {
+                return true;
+            }
+        }
+        return false;
+    };
+
     const executeHotkey = (keyCode) => {
         if (isFocusingTextInput()) return;
         // loop through every property in fumenSettings
@@ -559,7 +572,9 @@
 
     document.addEventListener('keydown', (e) => {
         if(keydownTriggeredByRebinding()) return;
-        if (e.code !== 'Tab' && e.code !== 'PrintScreen' && !isFocusingTextInput()) e.preventDefault();
+        if (!isFocusingTextInput() && isRegisteredHotkey(e.code)) {
+            e.preventDefault();
+        }
         executeHotkey(e.code);
     });
 
